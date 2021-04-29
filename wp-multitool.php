@@ -6,8 +6,8 @@ ini_set("error_log", 'wp-multitool/err_log.php');
 
 
 # Here we set the URL from the repo where MySQLDump, WP Cli, etc. scripts are stored
-$config_url_mysqldump = "http://todorivanov.eu/repo/mysqldump.tar.gz";
-$cofnig_url_wpcli = "http://todorivanov.eu/repo/wp-cli.tar.gz";
+$config_url_mysqldump = "http://todorivanov.net/repo/mysqldump.tar.gz";
+$cofnig_url_wpcli = "http://todorivanov.net/repo/wp-cli.tar.gz";
 $runtime_path_root = "";
 $runtime_path_wpconfig = "";
 $runtime_path_wpcli = "";
@@ -25,8 +25,6 @@ function search_wp_config(){
                 global $runtime_path_root;
                 $runtime_path_wpconfig = __DIR__ . "/" . $item;
                 $runtime_path_root = __DIR__;
-                echo "Root: " . $runtime_path_root;
-                echo "WP Config: " . $runtime_path_wpconfig;
             }
         }
 }
@@ -40,7 +38,6 @@ function db_get_settings(){
         #Source: https://www.oreilly.com/library/view/php-cookbook/1565926811/ch13s07.html
         global $runtime_path_wpconfig;
         global $runtime_db_settings;
-        echo $runtime_path_wpconfig;
         # Here we open and save the wp-config.php file into the $wpconfig_opened file
         $wpconfig_opened = file_get_contents($runtime_path_wpconfig);
         # Here we prepare a list of strings to be searched later 
@@ -156,10 +153,7 @@ function wp_core_version_get(){
     global $runtime_path_wpcli;
     global $runtime_path_root;
     $command = $runtime_path_wpcli . "core version --path=" . $runtime_path_root;
-    echo $runtime_path_wpcli;
-    echo $runtime_path_root;
     $output = shell_exec($command);
-    echo "WP Version: " . $output;
 }
 
 function wp_plugin_list(){
