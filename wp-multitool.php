@@ -129,13 +129,13 @@ function files_permission_fix(){
         #return json_encode($response);
     }
     else{
-        $command = "find . -type d -print0 | xargs -0 chmod 0755 && find . -type f -print0 | xargs -0 chmod 0644; echo 'Permissions Reset!'";
+        $command = "find . -type d -print0 | xargs -0 chmod 0755 && find . -type f -print0 | xargs -0 chmod 0644;";
         # Here the variables are:
         # $command - the shell script that we're going to execute
         # $output - the result from successfully running the script
         # $return - the error code returned by the shell script, if there is such
         $result = exec($command, $output, $return);
-        if ($return != 0 ){
+        if ($return != 0){
             # TODO: Report that the execution of the command failed
             # In case the execution of the command failed
             echo "DEBUG: " . $output . $return;
@@ -217,26 +217,89 @@ function wp_core_version_get(){
 }
 
 function wp_plugin_list(){
-
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+        $response = array("Error" => "[ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " plugin list --path=" . $runtime_path_root;
+        $result = exec($command, $output, $return);
+        if ($return != 0){
+            # TODO: Report that the execution of the command failed
+            # In case the execution of the command failed
+            echo "DEBUG: " . $output . $return;
+        }
+        else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
 }
 
 function wp_theme_list(){
-
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+        $response = array("Error" => "[ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " theme list --path=" . $runtime_path_root;
+        $result = exec($command, $output, $return);
+        if ($return != 0){
+            # TODO: Report that the execution of the command failed
+            # In case the execution of the command failed
+            echo "DEBUG: " . $output . $return;
+        }
+        else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
 }
 
 function wp_cache_flush(){
-
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+        $response = array("Error" => "[ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " cache flush --path=" . $runtime_path_root;
+        $result = exec($command, $output, $return);
+        if ($return != 0){
+            # TODO: Report that the execution of the command failed
+            # In case the execution of the command failed
+            echo "DEBUG: " . $output . $return;
+        }
+        else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
 }
 
-
-
-search_wp_config();
-db_setup_mysqldump();
-wp_setup_cli();
-db_get_settings();
-db_generate_backup();
-wp_core_version_get();
-files_permission_fix();
 
 #
 #   Routing 
@@ -254,6 +317,15 @@ switch($_GET['function']){
     case 'wp-core-version-get':
         # Route: wp-multitool.php?function=wp-core-version-get
         wp_core_version_get();
+    case 'wp-plugin-list':
+        # Route: wp-multitool.php?function=wp-plugin-list
+        wp_plugin_list();
+    case 'wp-theme-list':
+        # Route: wp-multitool.php?function=wp-theme-list
+        wp_theme_list();
+    case 'wp-cache-flush':
+        # Route: wp-multitool.php?function=wp-cache-flush
+        wp_cache_flush();
     case 'file-perm-fix':
         # Route: wp-multitool.php?function=file-perm-fix
         files_permission_fix();
