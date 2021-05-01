@@ -29,6 +29,7 @@ function search_wp_config(){
         }
 }
 
+
 #
 #   Database functions
 #
@@ -58,6 +59,8 @@ function db_get_settings(){
             }
             else{
                 # TODO: Report inablity to find DB settings -> could be a custom wp-config.php file
+                $response = array("Error" => "[ERR][MySQL][01]", "Data" => "Failed to retrieve DB settings");
+                return json_encode($response);
             }
         }
 }
@@ -87,6 +90,8 @@ function db_setup_mysqldump(){
         }
         else{
             # TODO: Report inablity to download the MySQLDump script -> could be a connectivity problem
+            $response = array("Error" => "[ERR][MySQL][00]", "Data" => "Failed to generate backup");
+            return json_encode($response);
         }
     }
     # If else the file is already downloaded
@@ -103,15 +108,45 @@ function db_generate_backup(){
     }
     $date = date("Y-m-d-h-i");
     $dump->start('wp-multitool/backups/mysql/'. $runtime_db_settings['DB_NAME'] . '-' . $date . '.sql');
+    
     # TODO: Report the name of the db.sql file that was generated
+    $response = array("Info" => "[INFO][MySQL][00]", "Data"  => "Generated DB backup");
+    return json_encode($response);
 }
+
 
 #
 #   File functions
 #
 function files_permission_fix(){
-    
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    global $runtime_path_root;
+    if (empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and 'runtime_path_root' are empty
+        $response = array("Error" => "[ERR][FILE][00]", "Data" => "Failed to generate 'runtime_path_root'");
+        print_r($response); 
+        #return json_encode($response);
+    }
+    else{
+        $command = "find . -type d -print0 | xargs -0 chmod 0755 && find . -type f -print0 | xargs -0 chmod 0644; echo 'Permissions Reset!'";
+        # Here the variables are:
+        # $command - the shell script that we're going to execute
+        # $output - the result from successfully running the script
+        # $return - the error code returned by the shell script, if there is such
+        $result = exec($command, $output, $return);
+        if ($return != 0 ){
+            # TODO: Report that the execution of the command failed
+            # In case the execution of the command failed
+            echo "DEBUG: " . $output . $return;
+        }
+        else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
 }
+
 
 #
 #   WordPress functions
@@ -144,16 +179,41 @@ function wp_setup_cli(){
     }
     else{
         # If the wp-cli.phar is already downloaded:
-        $runtime_path_wpcli = $runtime_path_root . 'wp-multitool/wp-cli/wp-cli.phar';
+        $runtime_path_wpcli = $runtime_path_root . '/wp-multitool/wp-cli/wp-cli.phar';
     }
     
 }
 
 function wp_core_version_get(){
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
     global $runtime_path_wpcli;
     global $runtime_path_root;
-    $command = $runtime_path_wpcli . "core version --path=" . $runtime_path_root;
-    $output = shell_exec($command);
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and 'runtime_path_root' are empty
+        $response = array("Error" => "[ERR][WP][00]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " core version --path=" . $runtime_path_root;
+        # Here the variables are:
+        # $command - the shell script that we're going to execute
+        # $output - the result from successfully running the script
+        # $return - the error code returned by the shell script, if there is such
+        $result = exec($command, $output, $return);
+        if ($return != 0){
+            # TODO: Report that the execution of the command failed
+            # In case the execution of the command failed
+            echo "DEBUG: " . $output . $return;
+        }
+        else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
 }
 
 function wp_plugin_list(){
@@ -175,8 +235,8 @@ db_setup_mysqldump();
 wp_setup_cli();
 db_get_settings();
 db_generate_backup();
-
-
+wp_core_version_get();
+files_permission_fix();
 
 #
 #   Routing 
@@ -194,4 +254,7 @@ switch($_GET['function']){
     case 'wp-core-version-get':
         # Route: wp-multitool.php?function=wp-core-version-get
         wp_core_version_get();
+    case 'file-perm-fix':
+        # Route: wp-multitool.php?function=file-perm-fix
+        files_permission_fix();
 }
