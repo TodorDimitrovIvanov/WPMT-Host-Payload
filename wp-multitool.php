@@ -147,6 +147,22 @@ function files_permission_fix(){
     }
 }
 
+function files_root_size_get($dir=""){
+    # Source: https://stackoverflow.com/questions/478121/how-to-get-directory-size-in-php
+    search_wp_config();
+    global $runtime_path_root;
+
+    # NOTE: This solution only applies to Linux hosting. Not sure if we should support Windows hosting at all.
+    $io = popen('/usr/bin/du -sk ' . $runtime_path_root, 'r');
+    $size = fgets($io, 4096);
+    $size = substr($size, 0, strpos($size,"\t"));
+    pclose($io);
+    echo $size;
+}
+
+function files_root_archive(){
+    
+}
 
 #
 #   WordPress functions
@@ -300,7 +316,6 @@ function wp_cache_flush(){
     }
 }
 
-
 #
 #   Routing 
 #
@@ -329,4 +344,7 @@ switch($_GET['function']){
     case 'file-perm-fix':
         # Route: wp-multitool.php?function=file-perm-fix
         files_permission_fix();
-}
+    case 'file-root-size':
+        # Route: wp-multitool.php?function=file-root-size
+        files_root_size_get();
+    }
