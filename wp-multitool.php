@@ -232,6 +232,75 @@ function wp_core_version_get(){
     }
 }
 
+
+function wp_core_reset(){
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    search_wp_config();
+    # Then we specify the global variables that were defined with the previous two functions
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and 'runtime_path_root' are empty
+        $response = array("Error" => "[ERR][WP][00]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command1 = "php " . $runtime_path_wpcli . " core version";
+        $result1 = exec($command1, $output1, $return1);
+        if ($return1 != 0 ){
+            # TODO: Report that the execution of the command failed
+            # In case the execution of the command failed
+            echo "DEBUG: " .  $output1 . $return1;
+        }else{
+            # TODO: Add regex verification to '$output1[0]' to ensure that it passes WP version number
+            $command2 = "php " . $runtime_path_wpcli . " core download --force --version=" . $output1[0];
+            $result2 = exec($command2, $output2, $return2);
+            if ($return2 != 0){
+                # TODO: Report that the execution of the command failed
+                # In case the execution of the command failed
+                echo "DEBUG: " . $output2 . $return2;
+            }
+            else{
+                http_response_code(200);
+                echo json_encode($output2);
+            }
+        }
+    }
+}
+
+
+function wp_checksum_verify(){
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    search_wp_config();
+    # Then we specify the global variables that were defined with the previous two functions
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and 'runtime_path_root' are empty
+        $response = array("Error" => "[ERR][WP][00]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " core verify-checksums";
+        $result = exec($command, $output, $return);
+        if ($return != 0 ){
+            # TODO: Report that the execution of the command failed
+            # In case the execution of the command failed
+            echo "DEBUG: " . $output . $return;
+        }
+        else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
+
+}
+
+
 function wp_plugin_list(){
     # Here we find the doc root folder of the website using the 'search_wp_config' function
     search_wp_config();
@@ -259,6 +328,7 @@ function wp_plugin_list(){
         }
     }
 }
+
 
 function wp_theme_list(){
     # Here we find the doc root folder of the website using the 'search_wp_config' function
@@ -322,29 +392,46 @@ function wp_cache_flush(){
 # Source: https://stackoverflow.com/questions/4360182/call-php-function-from-url
 # Source: https://stackoverflow.com/a/4360206
 # Here we check the requests that are received by the script
-switch($_GET['function']){
+$request_URI = $_GET['function'];
+switch($request_URI){
     case 'wp-setup':
         # Route: wp-multitool.php?function=wp-setup
         wp_setup_cli();
+        break;
     case 'db-setup':
         # Route: wp-multitool.php?function=db-setup
         db_setup_mysqldump();
+        break;
     case 'wp-core-version-get':
         # Route: wp-multitool.php?function=wp-core-version-get
         wp_core_version_get();
+        break;
+    case 'wp-core-reset':
+        # Route: wp-multitool.php?function=wp-core-reset
+        wp_core_reset();
+        break;
+    case 'wp-checksum-verify':
+        # Route: wp-multitool.php?function=wp-checksum-verify
+        wp_checksum_verify();
+        break;
     case 'wp-plugin-list':
         # Route: wp-multitool.php?function=wp-plugin-list
         wp_plugin_list();
+        break;
     case 'wp-theme-list':
         # Route: wp-multitool.php?function=wp-theme-list
         wp_theme_list();
+        break;
     case 'wp-cache-flush':
         # Route: wp-multitool.php?function=wp-cache-flush
         wp_cache_flush();
+        break;
     case 'file-perm-fix':
         # Route: wp-multitool.php?function=file-perm-fix
         files_permission_fix();
+        break;
     case 'file-root-size':
         # Route: wp-multitool.php?function=file-root-size
         files_root_size_get();
+        break;
     }
