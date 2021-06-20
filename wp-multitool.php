@@ -1,5 +1,7 @@
 <?php
 
+use function PHPSTORM_META\type;
+
 error_reporting(E_ALL);
 ini_set("display_errors", 1);
 ini_set("error_log", 'wp-multitool/err_log.php');
@@ -8,13 +10,14 @@ ini_set("error_log", 'wp-multitool/err_log.php');
 # Here we set the URL from the repo where MySQLDump, WP Cli, etc. scripts are stored
 $config_url_mysqldump = "http://todorivanov.net/repo/mysqldump.tar.gz";
 $cofnig_url_wpcli = "http://todorivanov.net/repo/wp-cli.tar.gz";
+
 $runtime_path_root = "";
 $runtime_path_wpconfig = "";
 $runtime_path_wpcli = "";
 $runtime_db_settings = array();
 
 function search_wp_config(){
-    #Source: https://www.php.net/manual/en/function.scandir.php
+    # Source: https://www.php.net/manual/en/function.scandir.php
     # Here we get a list of all the files and folders in the root dir of the script
     $dir_scan = scandir(__DIR__);
     foreach ($dir_scan as $item){
@@ -27,6 +30,42 @@ function search_wp_config(){
                 $runtime_path_root = __DIR__;
             }
         }
+}
+
+
+function recursiveChmod($path, $filePerm=0644, $dirPerm=0755) {
+    # Source: https://gist.github.com/mikamboo/9205589
+
+    // Check if the path exists
+    if (!file_exists($path)) {
+        return(false);
+    }
+
+    // See whether this is a file
+    if (is_file($path)) {
+        // Chmod the file with our given filepermissions
+        chmod($path, $filePerm);
+
+    // If this is a directory...
+    } elseif (is_dir($path)) {
+        // Then get an array of the contents
+        $foldersAndFiles = scandir($path);
+
+        // Remove "." and ".." from the list
+        $entries = array_slice($foldersAndFiles, 2);
+
+        // Parse every result...
+        foreach ($entries as $entry) {
+            // And call this function again recursively, with the same permissions
+            recursiveChmod($path."/".$entry, $filePerm, $dirPerm);
+        }
+
+        // When we are done with the contents of the directory, we chmod the directory itself
+        chmod($path, $dirPerm);
+    }
+
+    // Everything seemed to work out well, return true
+    return(true);
 }
 
 
@@ -129,7 +168,7 @@ function files_permission_fix(){
         #return json_encode($response);
     }
     else{
-        $command = "find . -type d -print0 | xargs -0 chmod 0755 && find . -type f -print0 | xargs -0 chmod 0644;";
+        $command = "find " . $runtime_path_root . " -type d -print0 | xargs -0 chmod 0755 && find " . $runtime_path_root . " -type f -print0 | xargs -0 chmod 0644;";
         # Here the variables are:
         # $command - the shell script that we're going to execute
         # $output - the result from successfully running the script
@@ -138,7 +177,9 @@ function files_permission_fix(){
         if ($return != 0){
             # TODO: Report that the execution of the command failed
             # In case the execution of the command failed
-            echo "DEBUG: " . $output . $return;
+            echo $command;
+            echo "DEBUG: " . $return;
+            print_r($output);
         }
         else{
             http_response_code(200);
@@ -311,7 +352,7 @@ function wp_plugin_list(){
     global $runtime_path_root;
     if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
         # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
-        $response = array("Error" => "[ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        $response = array("Error" => "[ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'",);
         return json_encode($response);
     }
     else{
@@ -320,9 +361,114 @@ function wp_plugin_list(){
         if ($return != 0){
             # TODO: Report that the execution of the command failed
             # In case the execution of the command failed
-            echo "DEBUG: " . $output . $return;
+            $response = array("Error" => "[HOST][ERR][WP][02]", "Data" => "Failed to execute command: [" . $command . "]", 
+                                "Output: " => $output);
+            echo $response;
         }
         else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
+}
+
+function wp_plugin_update($plugin_name){
+    # IMPORTANT!!!!!
+    # The web-server must have sufficient permissions to the wp-content folder and for PHP processes it spawns
+    # Otherwise the script won't be able to download the theme files into the wp-content folder
+
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+        $response = array("Error" => "[HOST][ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " plugin update " . $plugin_name . " --path=" . $runtime_path_root;
+        # This is not pretty but the WP Cli won't properly update the plugin due to permissions/onwership 
+        recursiveChmod($runtime_path_root . "/wp-content", 0777, 0777);
+        $result = exec($command, $output, $return);        
+        # So after completing the update we reset the permissions
+        # This may have to be changed later if we find that the App can complete the update on most hosts or what permissions it needs 
+        recursiveChmod($runtime_path_root . "/wp-content", 0644, 0755);
+        if ($return != 0){
+            # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+            $response = array("Error" => "[HOST][ERR][WP][02]", "Data" => "Failed to execute command: [" . $command . "]", 
+                                    "Output: " => $output);
+            echo json_encode($response);
+        }else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    } 
+}
+
+
+function wp_plugin_deactivate($plugin_name){
+    # TODO: Extend this function so that it can also accept an array as parameter 
+    # And if so, disable all plugins that are listed within the array
+
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+        $response = array("Error" => "[HOST][ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " plugin deactivate " . $plugin_name . " --path=" . $runtime_path_root;
+        $response = exec ($command, $output, $return);
+        if ($return != 0 ){
+            # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+            print_r($output);
+            $response = array("Error" => "[HOST][ERR][WP][02]", "Data" => "Failed to execute command: [" . $command . "]", 
+                                    "Output: " => $output);
+            echo json_encode($output);
+        }else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
+}
+
+
+function wp_plugin_activate($plugin_name){
+    # TODO: Extend this function so that it can also accept an array as parameter 
+    # And if so, disable all plugins that are listed within the array
+
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+        $response = array("Error" => "[HOST][ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        echo json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " plugin activate " . $plugin_name . " --path=" . $runtime_path_root;
+        $response = exec ($command, $output, $return);
+        if ($return != 0 ){
+            # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+            print_r($output);
+            $response = array("Error" => "[HOST][ERR][WP][02]", "Data" => "Failed to execute command: [" . $command . "]", 
+                                    "Output: " => $output);
+            echo json_encode($output);
+        }else{
             http_response_code(200);
             echo json_encode($output);
         }
@@ -352,6 +498,74 @@ function wp_theme_list(){
             echo "DEBUG: " . $output . $return;
         }
         else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    }
+}
+
+function wp_theme_update($theme_name){
+    # IMPORTANT!!!!!
+    # The web-server must have sufficient permissions to the wp-content folder and for PHP processes it spawns
+    # Otherwise the script won't be able to download the theme files into the wp-content folder
+
+
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+        $response = array("Error" => "[HOST][ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " theme update " . $theme_name . " --path=" . $runtime_path_root;
+        # This is not pretty but the WP Cli won't properly update the plugin due to permissions/onwership 
+        recursiveChmod($runtime_path_root . "/wp-content", 0777, 0777);
+        $result = exec($command, $output, $return);        
+        # So after completing the update we reset the permissions
+        # This may have to be changed later if we find that the App can complete the update on most hosts or what permissions it needs 
+        recursiveChmod($runtime_path_root . "/wp-content", 0644, 0755);
+        if ($return != 0){
+            # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+            print_r($output);
+            $response = array("Error" => "[HOST][ERR][WP][02]", "Data" => "Failed to execute command: [" . $command . "]", 
+                                    "Output: " => $output);
+            echo json_encode($response);
+        }else{
+            http_response_code(200);
+            echo json_encode($output);
+        }
+    } 
+}
+
+function wp_theme_deactivate($theme_name){
+    # Here we find the doc root folder of the website using the 'search_wp_config' function
+    search_wp_config();
+    # Here we verify that the wp-cli is donwloaded within the 'wp-multitool' folder via the 'wp_setup_cli' function
+    wp_setup_cli();
+    # Then we specify the global variables that were defined with the previous two functions  
+    global $runtime_path_wpcli;
+    global $runtime_path_root;
+    if (empty($runtime_path_wpcli) || empty($runtime_path_root)){
+        # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+        $response = array("Error" => "[HOST][ERR][WP][01]", "Data" => "Failed to generate 'runtime_path_wpcli' or 'runtime_path_root'");
+        return json_encode($response);
+    }
+    else{
+        $command = "php " . $runtime_path_wpcli . " theme deactivate " . $theme_name . " --path=" . $runtime_path_root;
+        $response = exec ($command, $output, $return);
+        if ($return != 0 ){
+            # TODO: Report that the global functions 'runtime_path_wpcli' and/or 'runtime_path_root' are empty
+            print_r($output);
+            $response = array("Error" => "[HOST][ERR][WP][02]", "Data" => "Failed to execute command: [" . $command . "]", 
+                                    "Output: " => $output);
+            echo json_encode($output);
+        }else{
             http_response_code(200);
             echo json_encode($output);
         }
@@ -389,49 +603,61 @@ function wp_cache_flush(){
 #
 #   Routing 
 #
-# Source: https://stackoverflow.com/questions/4360182/call-php-function-from-url
-# Source: https://stackoverflow.com/a/4360206
-# Here we check the requests that are received by the script
-$request_URI = $_GET['function'];
-switch($request_URI){
-    case 'wp-setup':
-        # Route: wp-multitool.php?function=wp-setup
-        wp_setup_cli();
-        break;
-    case 'db-setup':
-        # Route: wp-multitool.php?function=db-setup
-        db_setup_mysqldump();
-        break;
-    case 'wp-core-version-get':
-        # Route: wp-multitool.php?function=wp-core-version-get
-        wp_core_version_get();
-        break;
-    case 'wp-core-reset':
-        # Route: wp-multitool.php?function=wp-core-reset
-        wp_core_reset();
-        break;
-    case 'wp-checksum-verify':
-        # Route: wp-multitool.php?function=wp-checksum-verify
-        wp_checksum_verify();
-        break;
-    case 'wp-plugin-list':
-        # Route: wp-multitool.php?function=wp-plugin-list
-        wp_plugin_list();
-        break;
-    case 'wp-theme-list':
-        # Route: wp-multitool.php?function=wp-theme-list
-        wp_theme_list();
-        break;
-    case 'wp-cache-flush':
-        # Route: wp-multitool.php?function=wp-cache-flush
-        wp_cache_flush();
-        break;
-    case 'file-perm-fix':
-        # Route: wp-multitool.php?function=file-perm-fix
-        files_permission_fix();
-        break;
-    case 'file-root-size':
-        # Route: wp-multitool.php?function=file-root-size
-        files_root_size_get();
-        break;
+# Source: https://www.geeksforgeeks.org/how-to-call-php-function-from-string-stored-in-a-variable/
+$options_file = array(
+    "backup" => "files_root_archive",
+    "size" => "files_root_size_get",
+    "permissions" => "files_permission_fix" 
+);
+$options_db = array(
+    "setup" => "db_setup_mysqldump",
+    "settings" => "db_get_settings",
+    "export" => "db_generate_backup"
+);
+$options_wp_core = array(
+    "version" => "wp_core_version_get",
+    "reset" => "wp_core_reset"
+);
+$options_wp_plugin = array(
+    "list" => "wp_plugin_list",
+    "update" => "wp_plugin_update",
+    "enable" => "wp_plugin_activate",
+    "disable" => "wp_plugin_deactivate"
+);
+$options_wp_theme = array(
+    "list" => "wp_theme_list",
+    "update" => "wp_theme_update",
+    "disable" => "wp_theme_deactivate" 
+);
+$options_wp_other = array(
+
+);
+$req_types = array(
+    "file" => $options_file, 
+    "db" => $options_db,
+    "wp-core" => $options_wp_core, 
+    "wp-plugin" => $options_wp_plugin, 
+    "wp-theme" => $options_wp_theme, 
+    "wp-other" => $options_wp_other
+);
+
+$get_type = $_GET['type'];
+$get_option = $_GET['option'];
+$get_data = $_GET['data'];
+
+foreach ($req_types as $req => $req_types_element){
+    if ($req == $get_type){
+        $req_ref = $req_types[$req];
+        foreach ($req_ref as $opt_key => $req_options_element){
+            if ($opt_key == $get_option){
+                $option_ref = $req_ref[$opt_key];
+                if (isset($get_data)){
+                    $option_ref($get_data);
+                }
+                else{
+                    $option_ref();
+                }
+            }
+        }  
     }
+}
