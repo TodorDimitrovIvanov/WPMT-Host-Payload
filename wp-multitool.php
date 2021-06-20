@@ -73,6 +73,7 @@ function recursiveChmod($path, $filePerm=0644, $dirPerm=0755) {
 #   Database functions
 #
 function db_get_settings(){
+        search_wp_config();
         #Source: https://stackoverflow.com/questions/3686177/php-to-search-within-txt-file-and-echo-the-whole-line
         #Source: https://www.php.net/manual/en/function.preg-match-all.php
         #Source: https://www.oreilly.com/library/view/php-cookbook/1565926811/ch13s07.html
@@ -98,7 +99,7 @@ function db_get_settings(){
             }
             else{
                 # TODO: Report inablity to find DB settings -> could be a custom wp-config.php file
-                $response = array("Error" => "[ERR][MySQL][01]", "Data" => "Failed to retrieve DB settings");
+                $response = array("Error" => "[HOST][ERR][MySQL][01]", "Data" => "Failed to retrieve DB settings");
                 return json_encode($response);
             }
         }
@@ -129,7 +130,7 @@ function db_setup_mysqldump(){
         }
         else{
             # TODO: Report inablity to download the MySQLDump script -> could be a connectivity problem
-            $response = array("Error" => "[ERR][MySQL][00]", "Data" => "Failed to generate backup");
+            $response = array("Error" => "[HOST][ERR][MySQL][00]", "Data" => "Failed to generate backup");
             return json_encode($response);
         }
     }
@@ -137,10 +138,14 @@ function db_setup_mysqldump(){
 }
 
 function db_generate_backup(){
+    db_get_settings();
+    db_setup_mysqldump();
+
     include 'wp-multitool/mysqldump/src/Ifsnop/Mysqldump/Mysqldump.php';
     global $runtime_db_settings;
     $temp_host = $runtime_db_settings['DB_HOST'];
     $temp_db = $runtime_db_settings['DB_NAME'];
+    echo "Host: " . $temp_hos . "DB: " . $temp_db;
     $dump = new Ifsnop\Mysqldump\Mysqldump("mysql:host=$temp_host;dbname=$temp_db", $runtime_db_settings['DB_USER'], $runtime_db_settings['DB_PASSWORD']);
     if (!file_exists('wp-multitool/backups/mysql')){
         mkdir('wp-multitool/backups/mysql', 0755, true);
@@ -149,7 +154,7 @@ function db_generate_backup(){
     $dump->start('wp-multitool/backups/mysql/'. $runtime_db_settings['DB_NAME'] . '-' . $date . '.sql');
     
     # TODO: Report the name of the db.sql file that was generated
-    $response = array("Info" => "[INFO][MySQL][00]", "Data"  => "Generated DB backup");
+    $response = array("Info" => "[HOST][INFO][MySQL][00]", "Data"  => "Generated DB backup");
     return json_encode($response);
 }
 
@@ -163,7 +168,7 @@ function files_permission_fix(){
     global $runtime_path_root;
     if (empty($runtime_path_root)){
         # TODO: Report that the global functions 'runtime_path_wpcli' and 'runtime_path_root' are empty
-        $response = array("Error" => "[ERR][FILE][00]", "Data" => "Failed to generate 'runtime_path_root'");
+        $response = array("Error" => "[HOST][ERR][FILE][00]", "Data" => "Failed to generate 'runtime_path_root'");
         print_r($response); 
         #return json_encode($response);
     }
