@@ -603,7 +603,6 @@ function wp_cache_flush(){
 #
 #   Routing 
 #
-# Source: https://www.geeksforgeeks.org/how-to-call-php-function-from-string-stored-in-a-variable/
 $options_file = array(
     "backup" => "files_root_archive",
     "size" => "files_root_size_get",
@@ -632,7 +631,7 @@ $options_wp_theme = array(
 $options_wp_other = array(
 
 );
-$req_types = array(
+$req_dict = array(
     "file" => $options_file, 
     "db" => $options_db,
     "wp-core" => $options_wp_core, 
@@ -641,19 +640,28 @@ $req_types = array(
     "wp-other" => $options_wp_other
 );
 
-$get_type = $_GET['type'];
-$get_option = $_GET['option'];
-$get_data = $_GET['data'];
+$received_type = $_GET['type'];
+$received_option = $_GET['option'];
+$received_data = $_GET['data'];
 
-foreach ($req_types as $req => $req_types_element){
-    if ($req == $get_type){
-        $req_ref = $req_types[$req];
+# Source: https://www.geeksforgeeks.org/how-to-call-php-function-from-string-stored-in-a-variable/
+# First we list each available request type:
+foreach ($req_dict as $req_key => $req_dict_element){
+    # Then we check if the provided request type matches one of the available ones
+    if ($req_key == $received_type){
+        # If it does we then create a reference to the matched type
+        $req_ref = $req_dict[$req_key];
+        # Then we list all available options under the matched request type
         foreach ($req_ref as $opt_key => $req_options_element){
-            if ($opt_key == $get_option){
+            # And if we find a match 
+            if ($opt_key == $received_option){
+                # We then create a reference to the matched option
                 $option_ref = $req_ref[$opt_key];
-                if (isset($get_data)){
-                    $option_ref($get_data);
+                # If there's provided data 
+                if (isset($received_data)){
+                    $option_ref($received_data);
                 }
+                # And if no data is provided we simply execute the function
                 else{
                     $option_ref();
                 }
