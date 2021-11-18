@@ -14,6 +14,7 @@ $cofnig_url_wpcli = "http://todorivanov.net/repo/wp-cli.tar.gz";
 $runtime_path_root = "";
 $runtime_path_wpconfig = "";
 $runtime_path_wpcli = "";
+$runtime_path_client_link = "wp-multitool/wp-cli/wp-cli.phar";
 $runtime_db_settings = array();
 
 function search_wp_config(){
@@ -30,6 +31,56 @@ function search_wp_config(){
                 $runtime_path_root = __DIR__;
             }
         }
+}
+
+function link_to_client($cid="", $wid=""){
+    if ($cid == "" | $wid == ""){
+        # If the parameters are empty we return an Err message
+        $response = array(
+            "Error" => "[HOST][API][Err][01]",
+            "Message" =>  "Can't link the Client to the Host. Missing link parameters"
+        );
+        return json_encode($response);
+    }else{
+        # First we check whether the config folder exists
+        $config_dir = 'wp-multitool/config';
+        if (!file_exists($config_dir)){
+            # And if doesn't exist we create it
+            mkdir(($config_dir), 0755, true);
+        }
+        # Next we check whether the config.json file exists
+        if (!file_exists($runtime_path_client_link)){
+            # And if it doesn't then we create an empty file
+            $empty_file = fopen($runtime_path_client_link, w);
+            fclose($empty_file);
+        }else{
+            # Else we read the config.json file
+            $read_file = json_decode(file_get_contents($runtime_path_client_link), true);
+            # DEBUG: And then print the contents of the file 
+            foreach ($read_file as $key => $item){
+                echo "Key: " . $key . " Value: " . $item;
+            }
+
+            # TODO: Next we should compare the "cid" and "wid" keys from the config.json file 
+            # With the cid and wid parameters received from the query paramaters 
+        }
+
+
+
+        # Here we check if the WP Cli is already downloaded
+    if (!file_exists($runtime_path_client_link)){
+        # In case the file doesn't exist we download it from the repo URL
+        if (file_put_contents('wp-multitool/' . $file_wpcli, file_get_contents($cofnig_url_wpcli))){
+            # Here we decompress the .gz archive 
+            $file_wpcli_decompressed = new PharData('wp-multitool/' . $file_wpcli);
+            $file_wpcli_decompressed -> decompress();
+            # And next we extract the file from the archive
+            $file_wpcli_extracted = new PharData('wp-multitool/' . $file_wpcli);
+            $file_wpcli_extracted -> extractTo('wp-multitool/wp-cli');
+            # TODO: Report wp-cli.phar location
+            }
+        }   
+    }   
 }
 
 
@@ -99,7 +150,7 @@ function db_get_settings(){
             }
             else{
                 # TODO: Report inablity to find DB settings -> could be a custom wp-config.php file
-                $response = array("Error" => "[HOST][ERR][MySQL][01]", "Data" => "Failed to retrieve DB settings");
+                $response = array("Error" => "[HOST][MySQL][Err][01]", "Data" => "Failed to retrieve DB settings");
                 return json_encode($response);
             }
         }
@@ -130,7 +181,7 @@ function db_setup_mysqldump(){
         }
         else{
             # TODO: Report inablity to download the MySQLDump script -> could be a connectivity problem
-            $response = array("Error" => "[HOST][ERR][MySQL][00]", "Data" => "Failed to generate backup");
+            $response = array("Error" => "[HOST][MySQL][Err][00]", "Data" => "Failed to generate backup");
             return json_encode($response);
         }
     }
@@ -154,7 +205,7 @@ function db_generate_backup(){
     $dump->start('wp-multitool/backups/mysql/'. $runtime_db_settings['DB_NAME'] . '-' . $date . '.sql');
     
     # TODO: Report the name of the db.sql file that was generated
-    $response = array("Info" => "[HOST][INFO][MySQL][00]", "Data"  => "Generated DB backup");
+    $response = array("Info" => "[HOST][MySQL][Info][00]", "Data"  => "Generated DB backup");
     return json_encode($response);
 }
 
@@ -168,7 +219,7 @@ function files_permission_fix(){
     global $runtime_path_root;
     if (empty($runtime_path_root)){
         # TODO: Report that the global functions 'runtime_path_wpcli' and 'runtime_path_root' are empty
-        $response = array("Error" => "[HOST][ERR][FILE][00]", "Data" => "Failed to generate 'runtime_path_root'");
+        $response = array("Error" => "[HOST][FILE][Err][00]", "Data" => "Failed to generate 'runtime_path_root'");
         print_r($response); 
         #return json_encode($response);
     }
@@ -206,10 +257,6 @@ function files_root_size_get($dir=""){
     echo $size;
 }
 
-function files_root_archive(){
-    
-}
-
 #
 #   WordPress functions
 #
@@ -243,7 +290,6 @@ function wp_setup_cli(){
         # If the wp-cli.phar is already downloaded:
         $runtime_path_wpcli = $runtime_path_root . '/wp-multitool/wp-cli/wp-cli.phar';
     }
-    
 }
 
 function wp_core_version_get(){
@@ -343,7 +389,6 @@ function wp_checksum_verify(){
             echo json_encode($output);
         }
     }
-
 }
 
 
@@ -636,6 +681,8 @@ $options_wp_theme = array(
 $options_wp_other = array(
 
 );
+
+
 $req_dict = array(
     "file" => $options_file, 
     "db" => $options_db,
@@ -645,9 +692,13 @@ $req_dict = array(
     "wp-other" => $options_wp_other
 );
 
+# We expect to receive the type, option and data strings via query parameters. Therefore the URL should look like this:
+# http://domain.com/wp-multitool.php?type=wp-core&option=reset
+
 $received_type = $_GET['type'];
 $received_option = $_GET['option'];
 $received_data = $_GET['data'];
+$received_cid = $_GET['cid'];
 
 # Source: https://www.geeksforgeeks.org/how-to-call-php-function-from-string-stored-in-a-variable/
 # First we list each available request type:
@@ -674,3 +725,4 @@ foreach ($req_dict as $req_key => $req_dict_element){
         }  
     }
 }
+
